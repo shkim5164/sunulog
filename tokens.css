@@ -1,0 +1,51 @@
+/* Hallmark · genre: editorial · macrostructure: Long Document · design-system: design.md · designed-as-app */
+/* Hallmark · pre-emit critique: P5 H4 E4 S5 R5 V4 */
+:root {
+  --color-paper: oklch(96.7% 0.012 85);
+  --color-paper-2: oklch(93.2% 0.015 85);
+  --color-sheet: oklch(98% 0.01 85);
+  --color-ink: oklch(28% 0.017 65);
+  --color-ink-2: oklch(41% 0.018 65);
+  --color-muted: oklch(49% 0.02 65);
+  --color-rule: oklch(81% 0.019 75);
+  --color-rule-light: oklch(88% 0.015 75);
+  --color-accent: oklch(44% 0.088 38);
+  --color-accent-ink: var(--color-sheet);
+  --color-accent-soft: oklch(92% 0.025 55);
+  --color-focus: oklch(43% 0.11 38);
+  --color-error: oklch(42% 0.14 28);
+  --color-shadow: oklch(26% 0.025 65 / 0.12);
+  --color-spine: oklch(30% 0.025 65 / 0.13);
+  --color-transparent: transparent;
+  --font-display: "Gowun Batang", "AppleMyungjo", "Batang", serif;
+  --font-body:
+    -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic",
+    sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", monospace;
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --space-3xl: 64px;
+  --space-4xl: 96px;
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-lg: 20px;
+  --text-xl: 28px;
+  --text-2xl: 36px;
+  --text-display: clamp(30px, 3.7vw, 50px);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-short: 180ms;
+  --dur-long: 350ms;
+  --radius-input: 3px;
+  --rule-width: 1px;
+  --page-bg: var(--color-sheet);
+  --text-color: var(--color-ink);
+  --shadow-color: var(--color-shadow);
+}

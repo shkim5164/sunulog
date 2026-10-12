@@ -1,11 +1,119 @@
 ---
-title: "첫 번째 이야기"
-date: "2025-10-01"
-author: "작가"
-tags: ["여행", "일기"]
+title: 첫 번째 이야기
+date: '2025-10-01'
+author: 작가
+tags:
+  - 여행
+  - 일기
+id: 1
+description: ''
+paper: fleck
+coverLayout:
+  version: 1
+  elements:
+    - id: image-d596bdd0-f7cc-4fc8-a60d-e04d01d18350
+      width: 70
+      height: 28
+      x: 14.7
+      'y': 49.2
+      hidden: false
+      kind: image
+      src: 'https://www.proalley.com/blog/basics-of-web-designing/'
+      alt: ''
+      fit: cover
+    - id: text-category
+      width: 80
+      height: 6
+      x: 0
+      'y': 18.5
+      hidden: false
+      kind: text
+      field: category
+      fontSize: 14
+      font: sans
+      align: center
+    - id: text-title
+      width: 84
+      height: 16
+      x: 0
+      'y': 8.2
+      hidden: false
+      kind: text
+      field: title
+      fontSize: 52
+      font: serif
+      align: center
+    - id: text-description
+      width: 72
+      height: 15
+      x: 14
+      'y': 56
+      hidden: false
+      kind: text
+      field: description
+      fontSize: 16
+      font: serif
+      align: center
+    - id: text-author
+      width: 76
+      height: 5
+      x: 0
+      'y': 25.4
+      hidden: false
+      kind: text
+      field: author
+      fontSize: 20
+      font: serif
+      align: center
+    - id: text-date
+      width: 76
+      height: 4
+      x: 0
+      'y': 32.4
+      hidden: false
+      kind: text
+      field: date
+      fontSize: 13
+      font: sans
+      align: center
+pageStyles:
+  - layout: prose
+    font: serif
+    align: left
+    fontSize: 17
+    lineHeight: 1.95
+    margin: normal
+  - layout: prose
+    font: serif
+    align: left
+    fontSize: 17
+    lineHeight: 1.95
+    margin: normal
+  - layout: prose
+    font: serif
+    align: left
+    fontSize: 17
+    lineHeight: 1.95
+    margin: normal
+  - layout: prose
+    font: serif
+    align: left
+    fontSize: 17
+    lineHeight: 1.95
+    margin: normal
+  - layout: prose
+    font: serif
+    align: left
+    fontSize: 17
+    lineHeight: 1.95
+    margin: normal
+  - layout: prose
+    font: serif
+    align: left
+    fontSize: 17
+    lineHeight: 1.95
+    margin: normal
 ---
-
----page---
 
 # 여행의 시작
 

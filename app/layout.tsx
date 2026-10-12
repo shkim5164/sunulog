@@ -1,9 +1,16 @@
 import "./globals.css";
+import "../tokens.css";
+import "./book.css";
+import "./comments.css";
 import type { Metadata } from "next";
 import Navbar from "@/components/Navbar";
+import AuthProvider from "@/components/AuthProvider";
 
 export const metadata: Metadata = {
-  title: "나만의 블로그",
+  title: {
+    default: "Sunulog",
+    template: "%s · Sunulog",
+  },
   description: "전자책처럼 읽는 블로그",
 };
 
@@ -15,8 +22,13 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body>
-        <Navbar />
-        <div className="pt-16">{children}</div>
+        <a className="skip-link" href="#main-content">
+          본문으로 건너뛰기
+        </a>
+        <AuthProvider>
+          <Navbar />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

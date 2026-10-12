@@ -2,6 +2,13 @@ import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
 import { BlogPost, PostPage } from "@/types/post";
+import { normalizeCoverLayout } from "@/lib/cover";
+import {
+  excerptOf,
+  isPaper,
+  normalizePageStyle,
+  paperForPost,
+} from "@/lib/book";
 
 const postsDirectory = path.join(process.cwd(), "posts");
 
@@ -23,17 +30,21 @@ export function getPostFromMarkdown(filename: string): BlogPost {
   const pages: PostPage[] = pageContents.map((content, index) => ({
     pageNumber: index + 1,
     content: content,
+    style: normalizePageStyle(data.pageStyles?.[index]),
   }));
 
   // 파일명에서 ID 추출 (예: 2025-10-01-first-story.md -> 1)
-  const id = filename.match(/^\d{4}-\d{2}-\d{2}/)
-    ? parseInt(filename.split("-").slice(2, 3).join(""), 10) ||
-      Math.abs(
-        filename
-          .split("")
-          .reduce((a, b) => ((a << 5) - a + b.charCodeAt(0)) | 0, 0)
-      )
-    : 1;
+  const id =
+    Number.isSafeInteger(data.id) && data.id > 0
+      ? data.id
+      : filename.match(/^\d{4}-\d{2}-\d{2}/)
+        ? parseInt(filename.split("-").slice(2, 3).join(""), 10) ||
+          Math.abs(
+            filename
+              .split("")
+              .reduce((a, b) => ((a << 5) - a + b.charCodeAt(0)) | 0, 0),
+          )
+        : 1;
 
   return {
     id,
@@ -44,6 +55,10 @@ export function getPostFromMarkdown(filename: string): BlogPost {
     thumbnail: data.thumbnail,
     description: data.description,
     tags: data.tags || [],
+    coverLayout: normalizeCoverLayout(data.coverLayout),
+    paper: isPaper(data.paper)
+      ? data.paper
+      : paperForPost({ id, title: data.title }),
   };
 }
 
@@ -80,5 +95,8 @@ export function getPostsSummary() {
     thumbnail: post.thumbnail,
     description: post.description,
     tags: post.tags,
+    paper: post.paper,
+    pageCount: post.pages.length,
+    excerpt: excerptOf(post.pages[0]?.content || ""),
   }));
 }

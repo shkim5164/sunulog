@@ -1,194 +1,151 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
+import type { PostSummary } from "@/types/post";
+import { postImage } from "@/lib/media";
+import Photo from "@/components/Photo";
+import Icon from "@/components/Icon";
 
-type SortOrder = "newest" | "oldest";
-
-interface PostSummary {
-  id: number;
-  title: string;
-  date: string;
-  author: string;
-  thumbnail?: string;
-  description?: string;
-  tags?: string[];
-}
-
-interface PostsGridProps {
+export default function PostsGrid({
+  posts,
+  compact = false,
+}: {
   posts: PostSummary[];
-}
-
-export default function PostsGrid({ posts }: PostsGridProps) {
-  const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
-  const [selectedTag, setSelectedTag] = useState<string>("전체");
-
-  // 모든 태그 수집
-  const allTags = useMemo(() => {
-    const tagSet = new Set<string>();
-    posts.forEach((post) => {
-      post.tags?.forEach((tag) => tagSet.add(tag));
-    });
-    return ["전체", ...Array.from(tagSet).sort()];
-  }, [posts]);
-
-  // 태그 필터링 및 정렬된 포스트 목록
-  const sortedPosts = useMemo(() => {
-    let filteredPosts = posts;
-
-    // 태그 필터링
-    if (selectedTag !== "전체") {
-      filteredPosts = posts.filter((post) => post.tags?.includes(selectedTag));
-    }
-
-    // 정렬
-    const postsCopy = [...filteredPosts];
-    if (sortOrder === "newest") {
-      return postsCopy.sort((a, b) => (a.date > b.date ? -1 : 1));
-    } else {
-      return postsCopy.sort((a, b) => (a.date < b.date ? -1 : 1));
-    }
-  }, [posts, sortOrder, selectedTag]);
-
+  compact?: boolean;
+}) {
+  const [sortOrder, setSortOrder] = useState("newest");
+  const [selectedTag, setSelectedTag] = useState("");
+  const [search, setSearch] = useState("");
+  const tags = useMemo(
+    () => Array.from(new Set(posts.flatMap((post) => post.tags || []))),
+    [posts],
+  );
+  const filtered = useMemo(
+    () =>
+      posts
+        .filter(
+          (post) =>
+            (!selectedTag || post.tags?.includes(selectedTag)) &&
+            `${post.title} ${post.description || ""} ${post.excerpt} ${post.tags?.join(" ") || ""}`
+              .toLocaleLowerCase()
+              .includes(search.toLocaleLowerCase()),
+        )
+        .sort((a, b) =>
+          sortOrder === "newest"
+            ? b.date.localeCompare(a.date)
+            : a.date.localeCompare(b.date),
+        ),
+    [posts, selectedTag, sortOrder, search],
+  );
+  const Heading = compact ? "h2" : "h1";
   return (
-    <div className="max-w-7xl mx-auto px-6 lg:px-8 py-12">
-      {/* 헤더 */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-6">
+    <section
+      className={`posts-section ${compact ? "" : "full-archive"}`}
+      aria-label="이야기 목록"
+    >
+      <div className="section-heading">
         <div>
-          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-4">
-            모든 포스트
-          </h1>
-          <p className="text-gray-600 text-lg">
-            총 {sortedPosts.length}개의 이야기
-          </p>
+          <Heading>{compact ? "책장에 꽂힌 이야기" : "모든 이야기"}</Heading>
+          <span>{posts.length}편의 기록</span>
         </div>
-
-        {/* 정렬 버튼 */}
-        <div className="flex gap-3">
-          <button
-            onClick={() => setSortOrder("newest")}
-            className={`px-6 py-3 rounded-full font-medium transition-all ${
-              sortOrder === "newest"
-                ? "bg-gray-900 text-white shadow-lg"
-                : "bg-white text-gray-700 hover:bg-gray-100"
-            }`}
-          >
-            최신순
-          </button>
-          <button
-            onClick={() => setSortOrder("oldest")}
-            className={`px-6 py-3 rounded-full font-medium transition-all ${
-              sortOrder === "oldest"
-                ? "bg-gray-900 text-white shadow-lg"
-                : "bg-white text-gray-700 hover:bg-gray-100"
-            }`}
-          >
-            오래된 순
-          </button>
-        </div>
+        {compact ? (
+          <Link className="text-link" href="/posts">
+            전체 보기 <Icon name="arrow-right" />
+          </Link>
+        ) : (
+          <p>다시 펼쳐 읽고 싶은 순간들을 모았습니다.</p>
+        )}
       </div>
-
-      {/* 태그 필터 */}
-      <div className="mb-8 overflow-x-auto">
-        <div className="flex gap-3 min-w-max pb-2">
-          {allTags.map((tag) => (
+      <div className="archive-toolbar">
+        <div className="tag-filters" aria-label="태그 필터">
+          <button
+            aria-pressed={!selectedTag}
+            onClick={() => setSelectedTag("")}
+          >
+            전체
+          </button>
+          {tags.map((tag) => (
             <button
               key={tag}
+              aria-pressed={selectedTag === tag}
               onClick={() => setSelectedTag(tag)}
-              className={`px-5 py-2.5 rounded-full font-medium transition-all whitespace-nowrap ${
-                selectedTag === tag
-                  ? "bg-purple-600 text-white shadow-lg"
-                  : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
-              }`}
             >
               {tag}
             </button>
           ))}
         </div>
-      </div>
-
-      {/* 포스트 그리드 */}
-      {sortedPosts.length === 0 ? (
-        <div className="text-center py-20">
-          <p className="text-gray-500 text-lg">아직 포스트가 없습니다.</p>
-          <p className="text-gray-400 mt-2">
-            <code className="bg-gray-200 px-2 py-1 rounded">posts/</code> 폴더에
-            Markdown 파일을 추가해보세요!
-          </p>
+        <div className="archive-tools">
+          <label className="search-field">
+            <Icon name="search" width="17" height="17" />
+            <input
+              aria-label="이야기 검색"
+              placeholder="이야기 찾기"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </label>
+          <select
+            aria-label="글 정렬"
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+          >
+            <option value="newest">최신순</option>
+            <option value="oldest">오래된 순</option>
+          </select>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sortedPosts.map((post) => (
+      </div>
+      {filtered.length ? (
+        <div className="story-grid">
+          {filtered.map((post) => (
             <Link
-              key={post.id}
+              className="story-card photo-story-card"
               href={`/post/${post.id}`}
-              className="group block"
+              key={post.id}
             >
-              <article className="h-full bg-white rounded-3xl overflow-hidden shadow-md hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2">
-                {/* 썸네일 */}
-                <div
-                  className="h-64 bg-gradient-to-br from-purple-300 to-pink-300 relative overflow-hidden"
-                  style={{
-                    backgroundImage: post.thumbnail
-                      ? `url(${post.thumbnail})`
-                      : undefined,
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                  }}
-                >
-                  {/* 날짜 배지 */}
-                  <div className="absolute top-4 left-4">
-                    <span className="inline-block px-4 py-2 bg-white rounded-full text-sm font-medium text-gray-900 shadow-md">
-                      {post.date}
-                    </span>
-                  </div>
-
-                  {/* 화살표 버튼 */}
-                  <div className="absolute bottom-4 right-4">
-                    <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                      <span className="text-xl">↗</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 내용 */}
-                <div className="p-6">
-                  {/* 태그 */}
-                  {post.tags && post.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {post.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="px-3 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <h2 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-purple-600 transition-colors">
-                    {post.title}
-                  </h2>
-                  {post.description && (
-                    <p className="text-gray-600 line-clamp-3 mb-4">
-                      {post.description}
-                    </p>
-                  )}
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">{post.author}</span>
-                    <span className="text-purple-600 font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
-                      읽기
-                      <span className="transform group-hover:translate-x-1 transition-transform">
-                        →
-                      </span>
-                    </span>
-                  </div>
-                </div>
-              </article>
+              <div className="story-photo">
+                <Photo
+                  src={postImage(post)}
+                  alt=""
+                  sizes="(max-width: 599px) calc(100vw - 48px), (max-width: 767px) 45vw, (max-width: 1200px) 30vw, 347px"
+                />
+              </div>
+              <h3>{post.title}</h3>
             </Link>
           ))}
         </div>
+      ) : (
+        <div className="empty-state">
+          <h3>
+            {posts.length
+              ? "일치하는 이야기가 없어요."
+              : "책장이 아직 비어 있어요."}
+          </h3>
+          <p>
+            {posts.length
+              ? "다른 검색어나 태그로 찾아보세요."
+              : "첫 번째 이야기를 써서 책장을 채워보세요."}
+          </p>
+          {posts.length ? (
+            <button
+              className="text-button"
+              onClick={() => {
+                setSelectedTag("");
+                setSearch("");
+              }}
+            >
+              필터 초기화
+            </button>
+          ) : (
+            <Link className="text-link" href="/write">
+              글 쓰기 <Icon name="pen" />
+            </Link>
+          )}
+        </div>
       )}
-    </div>
+      <p className="archive-count" aria-live="polite">
+        {filtered.length}편의 이야기
+      </p>
+    </section>
   );
 }

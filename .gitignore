@@ -24,9 +24,13 @@ yarn-error.log*
 
 # local env files
 .env*.local
+.env
 
 # vercel
 .vercel
+
+# Local anonymous comments (never deploy visitor data in Git)
+/.data/
 
 # typescript
 *.tsbuildinfo

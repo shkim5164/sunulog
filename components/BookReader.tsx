@@ -1,270 +1,494 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import Link from "next/link";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeRaw from "rehype-raw";
-import { BlogPost } from "@/types/post";
+import type { BlogPost, PostSummary } from "@/types/post";
+import { pageTitle, paperForPost } from "@/lib/book";
+import BookPage from "@/components/BookPage";
+import BookTitlePage from "@/components/BookTitlePage";
+import BookEndPage from "@/components/BookEndPage";
+import Icon from "@/components/Icon";
+import { remapBookPosition } from "@/lib/pagination";
+import { useSession } from "next-auth/react";
+import {
+  ReaderCommentsPanel,
+  useReaderComments,
+} from "@/components/ReaderComments";
+import type { TextAnchor } from "@/types/comment";
+import { resolveAnchor } from "@/lib/annotations";
+import { textRange } from "@/lib/annotation-dom";
 
-interface BookReaderProps {
+export default function BookReader({
+  post,
+  preview = false,
+  nextPosts = [],
+}: {
   post: BlogPost;
-}
+  preview?: boolean;
+  nextPosts?: PostSummary[];
+}) {
+  const { data: session } = useSession();
+  const [pagination, setPagination] = useState({
+    current: 0,
+    counts: [] as number[],
+  });
+  const [single, setSingle] = useState(false);
+  const [direction, setDirection] = useState(1);
+  const [toc, setToc] = useState(false);
+  const [isTurning, setIsTurning] = useState(false);
+  const book = useRef<HTMLDivElement>(null);
+  const comments = useReaderComments(post.id, !preview, book, isTurning);
+  const turning = useRef(false);
+  const touch = useRef<{ x: number; y: number } | null>(null);
+  const reduced = useReducedMotion();
+  const step = single ? 1 : 2;
+  const current = Math.floor(pagination.current / step) * step;
+  const setCurrent = useCallback(
+    (value: number | ((previous: number) => number)) => {
+      setPagination((previous) => ({
+        ...previous,
+        current: typeof value === "function" ? value(previous.current) : value,
+      }));
+    },
+    [],
+  );
+  const updateCount = useCallback(
+    (source: number, count: number) => {
+      setPagination((previous) => {
+        const before = post.pages.map(
+          (_, index) => previous.counts[index] || 1,
+        );
+        if (before[source] === count) return previous;
+        const after = [...before];
+        after[source] = count;
+        return {
+          counts: after,
+          current: remapBookPosition(previous.current, before, after, 1),
+        };
+      });
+    },
+    [post.pages],
+  );
+  const pages = post.pages.flatMap((page, source) =>
+    Array.from({ length: pagination.counts[source] || 1 }, (_, fragment) => ({
+      page,
+      source,
+      fragment,
+    })),
+  );
+  // Cover and recommendations are reader-owned leaves, outside authored page numbers.
+  const endIndex = pages.length + 1;
+  const total = endIndex + 1;
+  const lastVisible = Math.min(current + step - 1, endIndex);
+  const position =
+    current === endIndex
+      ? "다음 이야기"
+      : lastVisible === endIndex
+        ? `${current} · 다음 이야기`
+        : current === 0
+          ? `표지${lastVisible > 0 ? " · 1" : ""}`
+          : `${current}${lastVisible > current ? ` — ${lastVisible}` : ""}`;
+  const paper = paperForPost(post);
+  const Container = preview ? "section" : "main";
+  const recommendations = nextPosts
+    .filter((story) => story.id !== post.id)
+    .slice(0, 2);
+  function leaf(index: number, side: "left" | "right") {
+    if (index === 0)
+      return <BookTitlePage post={post} paper={paper} preview={preview} />;
+    if (index === endIndex)
+      return (
+        <BookEndPage
+          posts={recommendations}
+          paper={paper}
+          title={post.title}
+          side={side}
+        />
+      );
+    return (
+      <BookPage
+        page={pages[index - 1]?.page}
+        fragment={pages[index - 1]?.fragment}
+        displayNumber={index}
+        paper={paper}
+        title={post.title}
+        side={side}
+        annotationPage={pages[index - 1]?.source}
+        threads={preview ? undefined : comments.comments}
+        draftAnchor={comments.open ? comments.anchor : null}
+      />
+    );
+  }
+  const leafVariants = (side: "left" | "right") => ({
+    enter: (turn: number) => ({
+      opacity: 0,
+      x: single && !reduced ? `${turn * 14}%` : "0%",
+      rotateY: reduced
+        ? 0
+        : single
+          ? 0
+          : side === "left" && turn > 0
+            ? 80
+            : side === "right" && turn < 0
+              ? -80
+              : 0,
+    }),
+    center: { opacity: 1, rotateY: 0, x: "0%" },
+    exit: (turn: number) => ({
+      opacity: 0,
+      x: single && !reduced ? `${turn * -14}%` : "0%",
+      rotateY: reduced
+        ? 0
+        : single
+          ? 0
+          : side === "right" && turn > 0
+            ? -80
+            : side === "left" && turn < 0
+              ? 80
+              : 0,
+    }),
+  });
+  const go = useCallback(
+    (target: number) => {
+      if (turning.current) return;
+      const next = Math.max(
+        0,
+        Math.min(
+          Math.floor((total - 1) / step) * step,
+          Math.floor(target / step) * step,
+        ),
+      );
+      if (next === current) return;
+      turning.current = true;
+      setIsTurning(true);
+      setDirection(next > current ? 1 : -1);
+      setCurrent(next);
+    },
+    [current, step, total, setCurrent],
+  );
 
-export default function BookReader({ post }: BookReaderProps) {
-  // 현재 펼쳐진 페이지의 왼쪽 페이지 인덱스 (0부터 시작)
-  const [currentSpread, setCurrentSpread] = useState(0);
-  const [direction, setDirection] = useState(0);
-
-  const totalPages = post.pages.length;
-
-  const nextSpread = () => {
-    // 다음 펼침으로 이동 (2페이지씩)
-    if (currentSpread + 2 < totalPages) {
-      setDirection(1);
-      setCurrentSpread(currentSpread + 2);
-    }
-  };
-
-  const prevSpread = () => {
-    // 이전 펼침으로 이동 (2페이지씩)
-    if (currentSpread > 0) {
-      setDirection(-1);
-      setCurrentSpread(Math.max(0, currentSpread - 2));
-    }
-  };
-
-  // 키보드 이벤트 리스너
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight") {
-        nextSpread();
-      } else if (e.key === "ArrowLeft") {
-        prevSpread();
+    const query = window.matchMedia("(max-width: 767px)");
+    const update = () => {
+      turning.current = false;
+      setIsTurning(false);
+      setSingle(query.matches);
+    };
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      if (
+        event.defaultPrevented ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey ||
+        event.shiftKey ||
+        target.closest(
+          "input, textarea, select, [contenteditable='true'], .annotation-panel",
+        )
+      )
+        return;
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        go(current + step);
+      }
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        go(current - step);
       }
     };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [current, step, go]);
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentSpread]);
-
-  // 현재 펼침에서 보이는 왼쪽, 오른쪽 페이지
-  const leftPage = post.pages[currentSpread];
-  const rightPage = post.pages[currentSpread + 1];
-
-  // 왼쪽 페이지는 이전으로 갈 때 회전
-  const leftPageVariants = {
-    enter: {
-      rotateY: 0,
-      opacity: 1,
-      zIndex: 1,
-      transformOrigin: "right center",
-    },
-    center: {
-      rotateY: 0,
-      opacity: 1,
-      zIndex: 2,
-      transformOrigin: "right center",
-    },
-    exit: (direction: number) => ({
-      rotateY: direction < 0 ? 180 : 0,
-      opacity: direction < 0 ? 1 : 0,
-      zIndex: direction < 0 ? 3 : 2,
-      transformOrigin: "right center",
-    }),
-  };
-
-  // 오른쪽 페이지는 다음으로 갈 때 회전
-  const rightPageVariants = {
-    enter: {
-      rotateY: 0,
-      opacity: 1,
-      zIndex: 1,
-      transformOrigin: "left center",
-    },
-    center: {
-      rotateY: 0,
-      opacity: 1,
-      zIndex: 2,
-      transformOrigin: "left center",
-    },
-    exit: (direction: number) => ({
-      rotateY: direction > 0 ? -180 : 0,
-      opacity: direction > 0 ? 1 : 0,
-      zIndex: direction > 0 ? 3 : 2,
-      transformOrigin: "left center",
-    }),
-  };
+  useEffect(() => {
+    if (current >= total)
+      setCurrent(Math.max(0, Math.floor((total - 1) / step) * step));
+  }, [total, current, step, setCurrent]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 md:p-8 bg-gradient-to-br from-purple-600 via-purple-500 to-indigo-600">
-      <div className="w-full max-w-7xl">
-        {/* 책 제목 */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mt-4">{post.title}</h1>
-          <p className="text-white/80 mt-2">
-            {post.author} · {post.date}
-          </p>
-        </div>
-
-        {/* 펼쳐진 책 (두 페이지) */}
-        <div className="relative page-flip-container">
-          <div className="flex gap-1 book-shadow rounded-lg overflow-hidden">
-            {/* 왼쪽 페이지 - 이전으로 갈 때 회전 */}
-            <div
-              className="flex-1 relative min-h-[700px] border-r-2 border-gray-300/50"
-              style={{ perspective: "2000px" }}
-            >
-              <AnimatePresence initial={false} custom={direction}>
-                <motion.div
-                  key={`left-${currentSpread}`}
-                  custom={direction}
-                  variants={leftPageVariants}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  transition={{
-                    rotateY: {
-                      type: "spring",
-                      stiffness: 60,
-                      damping: 20,
-                    },
-                    opacity: { duration: 0.2 },
-                  }}
-                  className="absolute inset-0 bg-[var(--page-bg)] page-texture p-8 md:p-12 page-3d"
-                  style={{
-                    transformStyle: "preserve-3d",
-                  }}
-                >
-                  {leftPage ? (
-                    <>
-                      <div className="prose prose-lg max-w-none mb-16 h-full overflow-auto markdown-content">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          rehypePlugins={[rehypeRaw]}
-                          className="text-[var(--text-color)] leading-relaxed"
-                        >
-                          {leftPage.content}
-                        </ReactMarkdown>
-                      </div>
-                      {/* 왼쪽 페이지 번호 */}
-                      <div className="absolute bottom-8 left-8 text-gray-400 text-sm font-serif">
-                        {leftPage.pageNumber}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-gray-400">
-                      <p className="text-lg">시작 페이지</p>
-                    </div>
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-
-            {/* 오른쪽 페이지 - 3D 회전 */}
-            <div
-              className="flex-1 relative min-h-[700px]"
-              style={{ perspective: "2000px" }}
-            >
-              <AnimatePresence initial={false} custom={direction}>
-                <motion.div
-                  key={`right-${currentSpread}`}
-                  custom={direction}
-                  variants={rightPageVariants}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  transition={{
-                    rotateY: {
-                      type: "spring",
-                      stiffness: 60,
-                      damping: 20,
-                    },
-                    opacity: { duration: 0.2 },
-                  }}
-                  className="absolute inset-0 bg-[var(--page-bg)] page-texture p-8 md:p-12 page-3d"
-                  style={{
-                    transformStyle: "preserve-3d",
-                  }}
-                >
-                  {rightPage ? (
-                    <>
-                      <div className="prose prose-lg max-w-none mb-16 h-full overflow-auto markdown-content">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          rehypePlugins={[rehypeRaw]}
-                          className="text-[var(--text-color)] leading-relaxed"
-                        >
-                          {rightPage.content}
-                        </ReactMarkdown>
-                      </div>
-                      {/* 오른쪽 페이지 번호 */}
-                      <div className="absolute bottom-8 right-8 text-gray-400 text-sm font-serif">
-                        {rightPage.pageNumber}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-gray-400">
-                      <p className="text-lg">끝</p>
-                    </div>
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-          </div>
-
-          {/* 네비게이션 버튼 */}
-          <div className="flex justify-between items-center mt-8">
+    <Container
+      id={preview ? undefined : "main-content"}
+      className={`reader-main ${preview ? "reader-preview" : ""} ${comments.open && !preview ? "reader-with-comments" : ""}`}
+    >
+      <div className="reader-topline">
+        {preview ? (
+          <span>독자에게 보이는 모습</span>
+        ) : (
+          <Link href="/posts" className="text-link">
+            <Icon name="arrow-left" />
+            서재로
+          </Link>
+        )}
+        <div className="reader-actions">
+          {!preview && (
             <button
-              onClick={prevSpread}
-              disabled={currentSpread === 0}
-              className="px-8 py-3 bg-white/90 backdrop-blur-sm rounded-lg font-semibold text-gray-800 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white hover:shadow-lg transition-all transform hover:scale-105 active:scale-95"
+              id="reader-comments-toggle"
+              className="text-button"
+              aria-expanded={comments.open}
+              aria-haspopup="dialog"
+              onClick={() =>
+                comments.open ? comments.close() : comments.setOpen(true)
+              }
             >
-              ← 이전
+              문장 댓글{" "}
+              <span>
+                {comments.comments.filter((comment) => !comment.parentId)
+                  .length || ""}
+              </span>
             </button>
-
-            {/* 페이지 인디케이터 */}
-            <div className="flex gap-2">
-              {Array.from({ length: Math.ceil(totalPages / 2) }).map(
-                (_, index) => {
-                  const spreadIndex = index * 2;
-                  return (
-                    <button
-                      key={index}
-                      onClick={() => {
-                        setDirection(spreadIndex > currentSpread ? 1 : -1);
-                        setCurrentSpread(spreadIndex);
-                      }}
-                      className={`w-3 h-3 rounded-full transition-all ${
-                        spreadIndex === currentSpread
-                          ? "bg-white w-8"
-                          : "bg-white/40 hover:bg-white/60"
-                      }`}
-                      aria-label={`${spreadIndex + 1}-${
-                        spreadIndex + 2
-                      } 페이지로 이동`}
-                    />
-                  );
-                }
-              )}
-            </div>
-
-            <button
-              onClick={nextSpread}
-              disabled={currentSpread + 2 >= totalPages}
-              className="px-8 py-3 bg-white/90 backdrop-blur-sm rounded-lg font-semibold text-gray-800 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white hover:shadow-lg transition-all transform hover:scale-105 active:scale-95"
-            >
-              다음 →
-            </button>
-          </div>
-        </div>
-
-        {/* 키보드 안내 */}
-        <div className="text-center mt-8 text-white/60 text-sm">
-          💡 Tip: 키보드 방향키(← →)로도 페이지를 넘길 수 있습니다
+          )}
+          <button
+            className="text-button"
+            aria-expanded={toc}
+            onClick={() => setToc(!toc)}
+          >
+            <Icon name="list" />
+            목차
+          </button>
+          {!preview && session?.isAdmin && (
+            <Link href={`/write?post=${post.id}`} className="text-link">
+              <Icon name="pen" />
+              편집
+            </Link>
+          )}
         </div>
       </div>
-    </div>
+      {toc && (
+        <nav className="book-toc" aria-label="페이지 목차">
+          <button
+            disabled={isTurning}
+            aria-current={current === 0 ? "page" : undefined}
+            onClick={() => {
+              go(0);
+              setToc(false);
+            }}
+          >
+            <span>—</span>
+            표지
+          </button>
+          {post.pages.map((page, i) => {
+            const start = pages.findIndex((leaf) => leaf.source === i) + 1;
+            const count = pagination.counts[i] || 1;
+            return (
+              <button
+                key={i}
+                disabled={isTurning}
+                aria-current={
+                  start <= lastVisible && start + count > current
+                    ? "page"
+                    : undefined
+                }
+                onClick={() => {
+                  go(start);
+                  setToc(false);
+                }}
+              >
+                <span>{String(start).padStart(2, "0")}</span>
+                {pageTitle(page.content, i)}
+              </button>
+            );
+          })}
+          <button
+            disabled={isTurning}
+            aria-current={
+              current <= endIndex && lastVisible === endIndex
+                ? "page"
+                : undefined
+            }
+            onClick={() => {
+              go(endIndex);
+              setToc(false);
+            }}
+          >
+            <span>—</span>
+            다음 이야기
+          </button>
+        </nav>
+      )}
+      <div
+        className="reader-book"
+        ref={book}
+        aria-busy={isTurning}
+        onPointerUp={() => requestAnimationFrame(comments.captureSelection)}
+        onClick={(event) => {
+          if (window.getSelection()?.toString()) return;
+          const mark = (event.target as Element).closest<HTMLElement>(
+            "[data-thread-ids]",
+          );
+          if (mark) {
+            event.preventDefault();
+            comments.showThreads(mark.dataset.threadIds?.split(" "));
+          }
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          const mark = (event.target as Element).closest<HTMLElement>(
+            "[data-thread-ids]",
+          );
+          if (mark) {
+            event.preventDefault();
+            comments.showThreads(mark.dataset.threadIds?.split(" "));
+          }
+        }}
+        onTouchCancel={() => {
+          touch.current = null;
+        }}
+        onTouchStart={(event) => {
+          touch.current = {
+            x: event.changedTouches[0].clientX,
+            y: event.changedTouches[0].clientY,
+          };
+        }}
+        onTouchEnd={(event) => {
+          if (!touch.current || window.getSelection()?.toString()) {
+            touch.current = null;
+            return;
+          }
+          const dx = event.changedTouches[0].clientX - touch.current.x;
+          const dy = event.changedTouches[0].clientY - touch.current.y;
+          if (Math.abs(dx) > 65 && Math.abs(dx) > Math.abs(dy) * 1.5)
+            go(current + (dx < 0 ? step : -step));
+          touch.current = null;
+        }}
+      >
+        <div
+          className="book-measurements"
+          aria-hidden="true"
+          ref={(element) => element?.setAttribute("inert", "")}
+          style={{ width: single ? "100%" : "50%" }}
+        >
+          {post.pages.map((page, index) => (
+            <BookPage
+              key={index}
+              page={page}
+              paper={paper}
+              title={post.title}
+              measuring
+              annotationPage={index}
+              onFragmentCount={(count) => updateCount(index, count)}
+            />
+          ))}
+        </div>
+        <AnimatePresence initial={false} mode="wait" custom={direction}>
+          <motion.div
+            key={`${single ? "single" : "spread"}-${current}`}
+            className={`book-spread ${single ? "single-page" : ""}`}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            custom={direction}
+            onAnimationComplete={(definition) => {
+              if (definition === "center") {
+                turning.current = false;
+                setIsTurning(false);
+              }
+            }}
+          >
+            <motion.div
+              className="page-turn left-page-turn"
+              custom={direction}
+              variants={leafVariants("left")}
+              transition={{
+                duration: reduced ? 0.12 : 0.3,
+                ease: [0.16, 1, 0.3, 1],
+              }}
+            >
+              {leaf(current, "left")}
+            </motion.div>
+            {!single && (
+              <motion.div
+                className="page-turn right-page-turn"
+                custom={direction}
+                variants={leafVariants("right")}
+                transition={{
+                  duration: reduced ? 0.12 : 0.3,
+                  ease: [0.16, 1, 0.3, 1],
+                }}
+              >
+                {leaf(current + 1, "right")}
+              </motion.div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+      <div className="reader-controls">
+        <button
+          className="page-button"
+          onClick={() => go(current - step)}
+          disabled={isTurning || current === 0}
+        >
+          <Icon name="arrow-left" />
+          <span>이전 장</span>
+        </button>
+        <div className="page-position">
+          <span aria-live="polite">
+            {position} <span className="muted">/ 본문 {pages.length}쪽</span>
+          </span>
+          <div className="reading-progress">
+            <span
+              style={{
+                transform: `scaleX(${Math.min((current + step) / total, 1)})`,
+              }}
+            />
+          </div>
+        </div>
+        <button
+          className="page-button"
+          onClick={() => go(current + step)}
+          disabled={isTurning || current + step >= total}
+        >
+          <span>다음 장</span>
+          <Icon name="arrow-right" />
+        </button>
+      </div>
+      <p className="reader-hint">
+        {single
+          ? "좌우로 쓸어넘겨 다음 이야기를 읽어보세요."
+          : "키보드 ← → 로도 책장을 넘길 수 있어요."}
+      </p>
+      {!preview && (
+        <>
+          <p className="annotation-hint">
+            마음에 닿은 문장을 드래그해, 이야기를 남겨보세요.
+          </p>
+          <ReaderCommentsPanel
+            state={comments}
+            postId={post.id}
+            isAdmin={Boolean(session?.isAdmin)}
+            onJump={(anchor: TextAnchor) => {
+              const root = book.current?.querySelector<HTMLElement>(
+                `.book-measurements [data-annotation-page="${anchor.page}"]`,
+              );
+              const start = pages.findIndex(
+                (leaf) => leaf.source === anchor.page,
+              );
+              if (!root || start < 0) return false;
+              const range = resolveAnchor(root.textContent || "", anchor);
+              if (!range) return false;
+              const rect = range
+                ? textRange(root, range.start, range.end)?.getClientRects()[0]
+                : null;
+              const bounds = root.getBoundingClientRect();
+              const fragment =
+                rect && bounds.width
+                  ? Math.max(
+                      0,
+                      Math.floor((rect.left - bounds.left + 1) / bounds.width),
+                    )
+                  : 0;
+              go(start + 1 + fragment);
+              return true;
+            }}
+          />
+        </>
+      )}
+    </Container>
   );
 }

@@ -1,0 +1,34 @@
+[
+  {
+    "date": "2026-10-12",
+    "macrostructure": "Workbench",
+    "theme": "paper library",
+    "scope": "cover editor",
+    "enrichment": "author-uploaded cover photographs",
+    "brief": "Free-positioned metadata and images on a shared responsive cover canvas, with resizing, keyboard controls and undo"
+  },
+  {
+    "date": "2026-10-12",
+    "macrostructure": "Long Document",
+    "theme": "paper library",
+    "scope": "reader",
+    "enrichment": "user-supplied paper textures",
+    "brief": "Larger book spread with an opening title leaf for categories, title, description, author and date; authored page numbers preserved"
+  },
+  {
+    "date": "2026-10-12",
+    "macrostructure": "Photographic",
+    "theme": "paper library",
+    "scope": "home and archive",
+    "enrichment": "self-hosted Unsplash photographs",
+    "brief": "Wide editable hero photograph with one-line introduction; image-and-title story cards"
+  },
+  {
+    "date": "2026-10-12",
+    "macrostructure": "Long Document",
+    "theme": "paper library",
+    "scope": "app",
+    "enrichment": "user-supplied paper textures",
+    "brief": "Book-like blog with editable pages, persistent paper selection and Gowun Batang typography"
+  }
+]

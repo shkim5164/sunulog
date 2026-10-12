@@ -1,0 +1,1 @@
+{"date":"2026-10-12","framework":"Next.js 14 App Router","fonts":"Georgia / serif → user requested Gowun Batang","motion":"framer-motion 10","spacing":"Tailwind default scale","palette":"Existing purple gradients replaced with paper and ink tokens","routes":["/","/posts","/post/[id]","/write"],"scope":"app"}
