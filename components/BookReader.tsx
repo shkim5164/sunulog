@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { BlogPost, PostSummary } from "@/types/post";
 import { pageTitle, paperForPost } from "@/lib/book";
 import BookPage from "@/components/BookPage";
+import PostMusic from "@/components/PostMusic";
 import BookTitlePage from "@/components/BookTitlePage";
 import BookEndPage from "@/components/BookEndPage";
 import Icon from "@/components/Icon";
@@ -312,6 +313,7 @@ export default function BookReader({
           </button>
         </nav>
       )}
+      <PostMusic key={post.id} url={post.youtubeUrl} />
       <div
         className="reader-book"
         ref={book}

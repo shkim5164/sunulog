@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
+import { normalizeYoutubeUrl } from "@/lib/youtube";
 import { BlogPost, PostPage } from "@/types/post";
 import { normalizeCoverLayout } from "@/lib/cover";
 import {
@@ -53,6 +54,7 @@ export function getPostFromMarkdown(filename: string): BlogPost {
     author: data.author,
     pages,
     thumbnail: data.thumbnail,
+    youtubeUrl: normalizeYoutubeUrl(data.youtubeUrl),
     description: data.description,
     tags: data.tags || [],
     coverLayout: normalizeCoverLayout(data.coverLayout),

@@ -636,6 +636,49 @@ input[type="range"] {
   margin: auto;
   padding: var(--space-xl) var(--space-lg) var(--space-2xl);
 }
+.post-music {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: 12px;
+  margin-bottom: var(--space-lg);
+  background: var(--color-paper);
+  border: 1px solid var(--color-border, #dedbd3);
+}
+.post-music iframe {
+  display: block;
+  width: 356px;
+  height: 200px;
+  max-width: 100%;
+  flex-shrink: 0;
+  border: 0;
+}
+.post-music-caption {
+  font-size: var(--text-sm);
+  line-height: 1.7;
+}
+.post-music-caption p {
+  color: var(--color-muted);
+  margin: 8px 0;
+}
+.post-music-caption a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@media (max-width: 767px) {
+  .post-music {
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+  }
+  .post-music-caption strong,
+  .post-music-caption p {
+    display: none;
+  }
+}
 .reader-topline,
 .reader-actions {
   display: flex;
@@ -2170,3 +2213,10 @@ input[type="range"] {
     padding: var(--space-lg);
   }
 }
+
+.admin-login-form { margin: var(--space-lg) 0; }
+.admin-login-form fieldset { display: grid; gap: 12px; border: 0; padding: 0; }
+.admin-login-form label { font-size: var(--text-sm); }
+.admin-login-form input { width: 100%; padding: 12px; border: 1px solid var(--color-rule); background: var(--color-paper); border-radius: 0; }
+.admin-login-form button { margin-top: 12px; justify-content: center; }
+.admin-login-form .auth-error { margin-top: 16px; font-size: var(--text-sm); }

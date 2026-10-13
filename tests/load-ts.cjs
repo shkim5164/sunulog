@@ -18,6 +18,7 @@ module.exports = function loadTs(filename) {
   vm.runInNewContext(source, {
     exports,
     URL,
+    Buffer,
     Math,
     Number,
     require: (name) =>

@@ -26,6 +26,7 @@ export interface BlogPost {
   tags?: string[]; // 태그 배열 (선택사항)
   paper?: Paper;
   coverLayout?: CoverLayout;
+  youtubeUrl?: string;
 }
 
 export type CoverField =

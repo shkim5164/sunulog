@@ -1,5 +1,6 @@
 import type { BlogPost, PageStyle, Paper } from "@/types/post";
 import { normalizeCoverLayout } from "@/lib/cover";
+import { normalizeYoutubeUrl } from "@/lib/youtube";
 
 export const papers: { id: Paper; name: string; description: string }[] = [
   { id: "cotton", name: "코튼", description: "포근한 결의 미색 종이" },
@@ -87,6 +88,7 @@ export function formatDate(date: string): string {
 // JSON is a YAML subset: quoting every text field also preserves punctuation and newlines.
 export function serializePost(post: BlogPost): string {
   const coverLayout = normalizeCoverLayout(post.coverLayout);
+  const youtubeUrl = normalizeYoutubeUrl(post.youtubeUrl);
   const metadata = {
     id: post.id,
     title: post.title,
@@ -98,6 +100,7 @@ export function serializePost(post: BlogPost): string {
     ),
     paper: paperForPost(post),
     ...(post.thumbnail ? { thumbnail: post.thumbnail } : {}),
+    ...(youtubeUrl ? { youtubeUrl } : {}),
     ...(coverLayout ? { coverLayout } : {}),
     pageStyles: post.pages.map((page) => normalizePageStyle(page.style)),
   };

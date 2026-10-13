@@ -1,74 +1,51 @@
 # Sunulog 관리자 로그인 설정
 
-GitHub 계정 한 개만 관리자로 허용합니다. `/login`에서 로그인하면 `/admin` 작업실에서 새 글 작성, 기존 글 편집, 메인 화면 설정으로 이동할 수 있습니다. 로그인은 데이터베이스 없이 암호화된 세션 쿠키를 사용합니다.
+관리자 한 명의 아이디·비밀번호로 로그인합니다. GitHub OAuth App이나 데이터베이스는 필요하지 않습니다. 비밀번호는 scrypt 해시로만 저장하며 세션은 NextAuth의 암호화된 HttpOnly 쿠키로 유지합니다.
 
-## 1. 관리자 계정 ID 확인
+## 로컬 계정 만들기
 
-`ADMIN_GITHUB_ID`에는 GitHub 사용자명이 아닌 **숫자 ID**를 넣습니다. 본인 계정으로 GitHub CLI에 로그인되어 있다면 다음 명령으로 확인할 수 있습니다.
+프로젝트 폴더의 터미널에서 실행하세요.
 
 ```bash
-gh api user --jq .id
+npm run admin:setup
 ```
 
-CLI가 없다면 `https://api.github.com/users/사용자명` 응답의 `id` 값을 확인하세요. 계정 이름을 바꾸어도 같은 관리자를 식별하기 위해 숫자 ID를 사용합니다. 값을 비워 두면 누구도 관리자 권한을 얻지 못합니다.
+아이디와 비밀번호를 두 번 입력합니다. 비밀번호는 입력 중 표시되지 않으며 12자 이상이어야 합니다. 스크립트는 `.env.local`에 아이디·비밀번호 해시를 저장하고, 없는 경우 세션 비밀키와 로컬 주소도 생성합니다. 기존의 다른 환경변수는 보존합니다. `.env.local`은 Git에서 제외되어 있습니다. 비밀번호 원문은 파일이나 로그에 저장하지 않습니다.
 
-## 2. GitHub OAuth App 만들기
+개발 서버를 재시작한 뒤 `http://127.0.0.1:3000/login`에서 로그인하세요. 다른 포트를 쓰면 `.env.local`의 `NEXTAUTH_URL`도 수정하세요.
 
-[GitHub OAuth Apps](https://github.com/settings/developers)에서 새 OAuth App을 만드세요.
+## Vercel 배포
 
-- Application name: `Sunulog`
-- Homepage URL: 실제 블로그의 HTTPS 주소
-- Authorization callback URL: `https://실제-블로그-도메인/api/auth/callback/github`
-
-앱의 **Client ID**와 **Client Secret**을 확보합니다. 저장소 접근 토큰(PAT)은 사용하지 않습니다. 로그인은 프로필과 이메일 읽기 권한만 요청하며 저장소 쓰기 권한을 요청하지 않습니다.
-
-## 3. Vercel 환경변수 설정
-
-프로젝트의 **Settings → Environment Variables**에서 Production 환경에 다음 값을 추가하세요. 비밀값을 채팅이나 Git에 올릴 필요는 없습니다.
+프로젝트의 Settings → Environment Variables에 다음 네 값을 등록하고 재배포하세요. 비밀값을 채팅이나 Git에 올리지 마세요.
 
 | 이름 | 값 |
 | --- | --- |
-| `NEXTAUTH_URL` | 블로그의 실제 HTTPS 주소. 예: `https://your-blog.vercel.app` |
-| `NEXTAUTH_SECRET` | 아래 명령으로 만든 무작위 값 |
-| `GITHUB_ID` | OAuth App의 Client ID |
-| `GITHUB_SECRET` | OAuth App의 Client Secret |
-| `ADMIN_GITHUB_ID` | 허용할 관리자 계정의 숫자 ID |
+| `NEXTAUTH_URL` | 실제 운영 도메인. 예: `https://your-blog.vercel.app` |
+| `NEXTAUTH_SECRET` | `openssl rand -base64 32`로 생성한 운영용 비밀키 |
+| `ADMIN_USERNAME` | `.env.local`에 설정한 아이디 |
+| `ADMIN_PASSWORD_HASH` | `.env.local`의 `scrypt:`로 시작하는 해시 전체 |
 
-```bash
-openssl rand -base64 32
-```
+운영에서는 HTTPS가 필요합니다. `GITHUB_ID`, `GITHUB_SECRET`, `ADMIN_GITHUB_ID`는 더 이상 사용하지 않습니다. 기존 GitHub 세션은 관리자 권한을 얻지 못합니다.
 
-값을 넣은 뒤 **변경한 코드를 배포하거나 재배포**하세요. `NEXTAUTH_URL`과 OAuth callback에 같은 도메인을 사용해야 합니다. 도메인을 변경하면 두 설정을 함께 수정하세요. Preview 환경도 사용하려면 해당 환경의 주소와 callback을 별도로 맞추세요.
+## 비밀번호 변경·분실
 
-## 4. 로컬 개발
+`npm run admin:setup`을 다시 실행해 새 비밀번호를 설정하세요. 운영에서는 새 `ADMIN_PASSWORD_HASH`를 등록하고 재배포합니다. 아이디나 해시를 변경하면 기존 세션은 다음 서버 검증에서 거부됩니다. `NEXTAUTH_SECRET` 교체도 기존 세션을 모두 무효화합니다. 공개 회원가입이나 비밀번호 재설정 API는 없습니다.
 
-`.env.example`을 `.env.local`로 복사하고 위 값들을 채우세요. 로컬용 OAuth App을 따로 만들면 운영 설정과 분리해 테스트할 수 있습니다.
+## 동작과 제한
 
-```text
-Homepage URL: http://127.0.0.1:3000
-Authorization callback URL: http://127.0.0.1:3000/api/auth/callback/github
-NEXTAUTH_URL=http://127.0.0.1:3000
-```
-
-개발 서버를 다시 실행한 뒤 같은 주소로 접속하세요. `localhost`와 `127.0.0.1`은 쿠키와 출처가 서로 다릅니다. 로컬에서도 로그인을 생략하는 우회 경로는 없습니다.
-
-## 확인할 동작
-
-- 비로그인 상태에서 `/admin`, `/write`, `/settings`에 접근하면 로그인 화면으로 이동합니다.
-- 허용된 계정으로 로그인하면 요청했던 화면으로 돌아갑니다.
-- 다른 GitHub 계정은 로그인할 수 없습니다.
-- 글·사진·설정 저장 API는 로그인과 요청 출처를 서버에서 검사합니다.
-- 작업실에서 로그아웃하면 관리자 화면이 다시 잠깁니다.
-- 로그인 설정이 빠지면 로그인 버튼은 비활성화되고 관리자 접근은 차단됩니다.
-
-세션 유효기간은 8시간이며 활동 시 갱신됩니다. 관리자 ID를 바꾸면 기존 계정의 권한은 다음 서버 검증에서 거부됩니다. `NEXTAUTH_SECRET`을 교체하고 재배포하면 기존 세션을 모두 무효화할 수 있습니다.
+- 비로그인 상태의 `/admin`, `/write`, `/settings` 및 저장 API 접근은 차단합니다.
+- 올바른 계정으로 로그인하면 원래 요청한 관리자 화면으로 돌아갑니다.
+- 잘못된 아이디와 비밀번호는 동일한 오류 문구로 안내합니다.
+- 비밀번호 검증은 **서버 인스턴스당 1분에 5회**로 제한합니다. 모든 요청이 한 예산을 공유하므로 IP나 아이디를 바꿔도 해당 인스턴스의 제한을 우회할 수 없습니다. 이 메모리 제한은 서버 재시작 시 초기화되고 여러 인스턴스 간 공유되지 않습니다. 공개 운영 배포에서는 Vercel Firewall 등에서 `POST /api/auth/callback/credentials`에 공통 요청 제한도 설정하세요.
+- 세션은 8시간이며 활동 시 갱신됩니다. 쿠키·CSRF 보호는 NextAuth가 처리합니다.
+- 설정이 빠지면 로그인과 관리자 접근을 차단합니다. 로컬 로그인 화면에는 누락된 설정 이름이 표시됩니다.
+- 로그인 화면은 `NEXTAUTH_URL` 호스트로 맞춰 쿠키와 저장 API 출처가 일치하도록 합니다.
 
 ## 글 저장은 별도 작업
 
-**관리자 로그인 연결만으로 Vercel에서 글이 영구 저장되지는 않습니다.** 현재 글·사진·설정은 프로젝트 파일을 사용하는 구조여서 쓰기 API는 관리자 로그인 후에도 localhost 개발 모드에서만 작동합니다. 운영 화면은 초안 편집과 Markdown 내려받기를 지원합니다. 온라인에서 바로 발행하려면 글과 사진을 보관할 영구 저장소를 추가해야 합니다.
+로그인만으로 Vercel에서 글이 영구 저장되지는 않습니다. 현재 글·사진·설정 저장 API는 localhost 개발 모드에서만 작동합니다. 운영에서는 Markdown 내려받기를 사용하며 온라인 발행에는 영구 저장소 연결이 필요합니다.
 
-## 참고 문서
+## 참고
 
-- [NextAuth.js App Router 및 서버 세션](https://next-auth.js.org/configuration/nextjs)
-- [GitHub OAuth App 등록](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app)
-- [Vercel 환경변수](https://vercel.com/docs/environment-variables)
+- [NextAuth Credentials provider](https://next-auth.js.org/providers/credentials)
+- [NextAuth 환경변수와 세션](https://next-auth.js.org/configuration/options)

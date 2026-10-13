@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getAdminSession, isAuthConfigured } from "@/lib/auth";
+import { headers } from "next/headers";
+import { getAdminSession } from "@/lib/auth";
+import { authConfiguration, authErrorMessage } from "@/lib/auth-config";
 import { adminReturnPath } from "@/lib/auth-policy";
-import AdminAuthButton from "@/components/AdminAuthButton";
+import AdminLoginForm from "@/components/AdminLoginForm";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -16,14 +18,16 @@ export default async function LoginPage({
   searchParams: { callbackUrl?: string; error?: string };
 }) {
   const returnTo = adminReturnPath(searchParams.callbackUrl);
+  const { configured, origin, issues } = authConfiguration(process.env);
+  // Start login on the canonical host so session cookies and write origins agree.
+  if (configured && origin && headers().get("host") !== new URL(origin).host) {
+    const canonical = new URL("/login", origin);
+    canonical.searchParams.set("callbackUrl", returnTo);
+    if (searchParams.error) canonical.searchParams.set("error", searchParams.error);
+    redirect(canonical.toString());
+  }
   if (await getAdminSession()) redirect(returnTo);
-  const configured = isAuthConfigured();
-  const error =
-    searchParams.error === "AccessDenied"
-      ? "관리자로 등록된 GitHub 계정으로 로그인해주세요."
-      : searchParams.error
-        ? "로그인을 완료하지 못했어요. 다시 시도해주세요."
-        : "";
+  const error = authErrorMessage(searchParams.error);
   return (
     <main id="main-content" className="auth-main">
       <section
@@ -47,11 +51,15 @@ export default async function LoginPage({
           </p>
         )}
         {!configured && (
-          <p className="auth-notice" role="status">
-            관리자 로그인 설정이 아직 완료되지 않았습니다.
-          </p>
+          <div className="auth-notice" role="status">
+            <p>관리자 로그인 설정이 아직 완료되지 않았습니다.</p>
+            {process.env.NODE_ENV === "development" && (
+              <ul>{issues.map((issue) => <li key={issue}>{issue}</li>)}</ul>
+            )}
+            <p>서버의 인증 환경변수를 확인하고 다시 배포해주세요.</p>
+          </div>
         )}
-        <AdminAuthButton callbackUrl={returnTo} disabled={!configured} />
+        <AdminLoginForm callbackUrl={returnTo} disabled={!configured} />
         <Link href="/" className="text-link">
           서재로 돌아가기
         </Link>

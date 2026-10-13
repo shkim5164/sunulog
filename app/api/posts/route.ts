@@ -9,6 +9,7 @@ import type { BlogPost } from "@/types/post";
 import { imageSource } from "@/lib/media";
 import { isCoverLayoutInput, normalizeCoverLayout } from "@/lib/cover";
 import { adminApiError } from "@/lib/auth";
+import { normalizeYoutubeUrl } from "@/lib/youtube";
 
 export const runtime = "nodejs";
 
@@ -78,6 +79,14 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+    if (input?.youtubeUrl !== undefined &&
+        (typeof input.youtubeUrl !== "string" ||
+          (input.youtubeUrl.trim() && !normalizeYoutubeUrl(input.youtubeUrl)))) {
+      return NextResponse.json(
+        { error: "배경음악 YouTube 영상 링크를 확인해주세요." },
+        { status: 400 },
+      );
+    }
     if (
       input?.coverLayout !== undefined &&
       !isCoverLayoutInput(input.coverLayout)
@@ -137,6 +146,7 @@ export async function POST(request: NextRequest) {
         ),
       ),
       paper: input.paper,
+      youtubeUrl: normalizeYoutubeUrl(input.youtubeUrl),
       coverLayout: normalizeCoverLayout(input.coverLayout),
       ...(typeof input.thumbnail === "string"
         ? { thumbnail: input.thumbnail }
@@ -176,6 +186,7 @@ export async function POST(request: NextRequest) {
         ...updated.data,
       };
       if (!post.thumbnail) delete metadata.thumbnail;
+      if (!post.youtubeUrl) delete metadata.youtubeUrl;
       if (!post.coverLayout) delete metadata.coverLayout;
       const serialized = matter.stringify(updated.content, metadata);
       const temporary = path.join(

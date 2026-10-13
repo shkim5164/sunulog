@@ -20,6 +20,7 @@ import ImageField from "@/components/ImageField";
 import { imageSource, postImage } from "@/lib/media";
 import CoverEditor from "@/components/CoverEditor";
 import { isCoverLayoutInput } from "@/lib/cover";
+import { youtubeVideoId } from "@/lib/youtube";
 
 function newDraft(): BlogPost {
   const date = new Intl.DateTimeFormat("sv-SE", {
@@ -46,6 +47,7 @@ function isDraft(value: unknown): value is BlogPost {
     typeof d.title === "string" &&
     typeof d.author === "string" &&
     typeof d.date === "string" &&
+    (d.youtubeUrl === undefined || typeof d.youtubeUrl === "string") &&
     isPaper(d.paper) &&
     Array.isArray(d.pages) &&
     d.pages.length > 0 &&
@@ -224,6 +226,10 @@ export default function BookEditor({
   async function publish() {
     if (publishing) return;
     setError("");
+    if (post.youtubeUrl?.trim() && !youtubeVideoId(post.youtubeUrl)) {
+      setError("배경음악 YouTube 영상 링크를 확인하거나 비워주세요.");
+      return;
+    }
     if (post.thumbnail && !imageSource(post.thumbnail)) {
       setError("대표 이미지 주소를 확인하거나 비워주세요.");
       return;
@@ -395,6 +401,23 @@ export default function BookEditor({
                 value={post.description || ""}
                 onChange={(e) => changePost({ description: e.target.value })}
               />
+            </label>
+            <label className="description-field">
+              <span>배경음악 YouTube 링크 <small>선택</small></span>
+              <input
+                type="url"
+                maxLength={2048}
+                placeholder="https://www.youtube.com/watch?v=…"
+                value={post.youtubeUrl || ""}
+                aria-describedby="youtube-link-help"
+                aria-invalid={Boolean(post.youtubeUrl?.trim() && !youtubeVideoId(post.youtubeUrl))}
+                onChange={(e) => changePost({ youtubeUrl: e.target.value })}
+              />
+              <small id="youtube-link-help">
+                {post.youtubeUrl?.trim() && !youtubeVideoId(post.youtubeUrl)
+                  ? "올바른 YouTube 영상 링크를 입력해주세요."
+                  : "독자가 영상을 재생하면 책장을 넘겨도 음악이 이어져요. 비우면 음악이 제거됩니다."}
+              </small>
             </label>
             <ImageField
               label="대표 이미지"

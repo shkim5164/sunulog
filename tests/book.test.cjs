@@ -41,6 +41,7 @@ test("Markdown round-trip preserves metadata, layout and authored page order", (
     tags: ["여행", "일기"],
     description: "한 줄: 소개",
     thumbnail: "/uploads/story-photo.jpg",
+    youtubeUrl: "https://youtu.be/M7lc1UVf-VE?si=share",
     paper: "vintage",
     pages: [
       {
@@ -60,6 +61,8 @@ test("Markdown round-trip preserves metadata, layout and authored page order", (
   assert.equal(parsed.data.id, post.id);
   assert.equal(parsed.data.paper, post.paper);
   assert.equal(parsed.data.thumbnail, post.thumbnail);
+  assert.equal(parsed.data.youtubeUrl, "https://www.youtube.com/watch?v=M7lc1UVf-VE");
+  assert.equal(matter(serializePost({ ...post, youtubeUrl: "" })).data.youtubeUrl, undefined);
   assert.equal(parsed.data.pageStyles[0].align, "center");
   assert.equal(parsed.data.pageStyles[1].margin, "wide");
   assert.equal(parsed.data.pageStyles[1].font, "sans");

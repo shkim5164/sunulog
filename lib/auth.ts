@@ -1,68 +1,50 @@
 import "server-only";
 import { getServerSession, type NextAuthOptions } from "next-auth";
-import GitHubProvider from "next-auth/providers/github";
+import CredentialsProvider from "next-auth/providers/credentials";
 import { redirect } from "next/navigation";
 import { NextResponse, type NextRequest } from "next/server";
-import { adminReturnPath, isAdminAccount, sameOrigin } from "@/lib/auth-policy";
+import { adminReturnPath, sameOrigin } from "@/lib/auth-policy";
+import { authConfiguration } from "@/lib/auth-config";
+import { credentialVersion, verifyCredentials, takeLoginAttempt } from "@/lib/admin-credentials";
 
 export function isAuthConfigured() {
-  try {
-    const url = new URL(process.env.NEXTAUTH_URL || "");
-    const allowedProtocol =
-      url.protocol === "https:" ||
-      (url.protocol === "http:" &&
-        ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname));
-    return Boolean(
-      allowedProtocol &&
-        url.pathname === "/" &&
-        !url.search &&
-        !url.hash &&
-        !url.username &&
-        !url.password &&
-        process.env.NEXTAUTH_SECRET &&
-        process.env.NEXTAUTH_SECRET.length >= 32 &&
-        process.env.GITHUB_ID &&
-        process.env.GITHUB_SECRET &&
-        /^[1-9]\d*$/.test(process.env.ADMIN_GITHUB_ID || ""),
-    );
-  } catch {
-    return false;
-  }
+  return authConfiguration(process.env).configured;
 }
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   providers: [
-    GitHubProvider({
-      clientId: process.env.GITHUB_ID || "",
-      clientSecret: process.env.GITHUB_SECRET || "",
+    CredentialsProvider({
+      name: "관리자 계정",
+      credentials: {
+        username: { label: "아이디", type: "text" },
+        password: { label: "비밀번호", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!isAuthConfigured()) return null;
+        if (!takeLoginAttempt()) throw new Error("TooManyAttempts");
+        const version = credentialVersion(process.env);
+        if (!(await verifyCredentials(credentials, process.env))) return null;
+        return { id: "admin", name: process.env.ADMIN_USERNAME, credentialVersion: version };
+      },
     }),
   ],
   session: { strategy: "jwt", maxAge: 8 * 60 * 60 },
   pages: { signIn: "/login", error: "/login" },
   callbacks: {
-    async signIn({ account }) {
-      return (
-        isAuthConfigured() &&
-        isAdminAccount(account, process.env.ADMIN_GITHUB_ID)
-      );
-    },
-    async jwt({ token, account }) {
-      // Client session updates cannot supply an identity or grant a role.
-      if (account)
-        token.githubId =
-          account.provider === "github" ? account.providerAccountId : undefined;
+    async jwt({ token, user, account }) {
+      // Only a server-authorized password login can create an administrator token.
+      if (account) {
+        token.adminVersion = account.provider === "credentials" && user?.id === "admin"
+          ? user.credentialVersion : undefined;
+      }
       return token;
     },
     async session({ session, token }) {
-      session.isAdmin =
-        isAuthConfigured() &&
-        isAdminAccount(
-          { provider: "github", providerAccountId: token.githubId },
-          process.env.ADMIN_GITHUB_ID,
-        );
-      if (session.user)
-        session.user.id = session.isAdmin ? token.githubId : undefined;
+      session.isAdmin = isAuthConfigured() &&
+        typeof token.adminVersion === "string" &&
+        token.adminVersion === credentialVersion(process.env);
+      if (session.user) session.user.id = session.isAdmin ? "admin" : undefined;
       return session;
     },
     async redirect({ url, baseUrl }) {
@@ -87,7 +69,7 @@ export const authOptions: NextAuthOptions = {
 export async function getAdminSession() {
   if (!isAuthConfigured()) return null;
   const session = await getServerSession(authOptions);
-  return session?.isAdmin && session.user?.id === process.env.ADMIN_GITHUB_ID
+  return session?.isAdmin && session.user?.id === "admin"
     ? session
     : null;
 }

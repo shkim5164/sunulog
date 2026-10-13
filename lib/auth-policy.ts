@@ -1,15 +1,3 @@
-export function isAdminAccount(
-  account: { provider?: string; providerAccountId?: string } | null | undefined,
-  allowedId: string | undefined,
-) {
-  return Boolean(
-    allowedId &&
-      /^[1-9]\d*$/.test(allowedId) &&
-      account?.provider === "github" &&
-      account.providerAccountId === allowedId,
-  );
-}
-
 export function adminReturnPath(value: unknown) {
   if (
     typeof value !== "string" ||
